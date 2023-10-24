@@ -1,22 +1,19 @@
 import { createApp } from "vue";
-import { router } from "./router";
-import store from "./store";
-// @ts-ignore
 import App from "./App.vue";
-//
-import ElementPlus from "element-plus";
+import store from "@/store";
+import { router } from "@/router";
+
+// load
+import { loadPlugins } from "@/plugins";
+
+// css
 import "element-plus/dist/index.css";
 
 // 实例化
 const app = createApp(App);
 
-// 注册elementPlus
-app.use(ElementPlus);
-// 注册路由
-app.use(router);
-// 状态
-app.use(store)
-// 挂载
-app.mount("#app");
+/** 加载插件 */
+loadPlugins(app)
 
-console.log(app);
+app.use(store).use(router);
+app.mount("#app");
