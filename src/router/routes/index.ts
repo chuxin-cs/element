@@ -6,10 +6,26 @@ import type { RouteRecordRaw } from "vue-router";
  */
 const constantRoutes: RouteRecordRaw[] = [
     {
+        path: "/403",
+        component: () => import("@/pages/error-page/403.vue"),
+        meta: {
+            hidden: true
+        }
+    },
+    {
+        path: "/404",
+        component: () => import("@/pages/error-page/404.vue"),
+        meta: {
+            hidden: true
+        },
+        alias: "/:pathMatch(.*)*"
+    },
+    {
         path: "/login",
-        name: "login",
-        // @ts-ignore
-        component: () => import("../pages/IconLogin/Index.vue"),
+        component: () => import("@/pages/login/index.vue"),
+        meta: {
+            hidden: true
+        }
     },
 ];
 
