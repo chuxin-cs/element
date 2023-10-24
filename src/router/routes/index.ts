@@ -6,7 +6,7 @@ const Layouts = () => import("@/layouts/index.vue");
  * 常驻路由
  * 除了 redirect/403/404/login 等隐藏页面
  */
-const constantRoutes: RouteRecordRaw[] = [
+export const constantRoutes: RouteRecordRaw[] = [
   {
     path: "/",
     component: Layouts,
