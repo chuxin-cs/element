@@ -1,11 +1,3 @@
-<script lang="ts" setup>
+<script lang="ts" setup></script>
 
-</script>
-
-<template>
-
-</template>
-
-<style scoped lang="scss">
-
-</style>
+<template>111</template>
