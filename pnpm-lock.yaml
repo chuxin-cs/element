@@ -11,9 +11,21 @@ dependencies:
   axios:
     specifier: ^1.5.1
     version: registry.npmjs.org/axios@1.5.1
+  dayjs:
+    specifier: ^1.11.10
+    version: registry.npmjs.org/dayjs@1.11.10
   element-plus:
     specifier: ^2.4.1
     version: registry.npmjs.org/element-plus@2.4.1(vue@3.3.4)
+  js-cookie:
+    specifier: ^3.0.5
+    version: registry.npmjs.org/js-cookie@3.0.5
+  normalize.css:
+    specifier: ^8.0.1
+    version: registry.npmjs.org/normalize.css@8.0.1
+  nprogress:
+    specifier: ^0.2.0
+    version: registry.npmjs.org/nprogress@0.2.0
   pinia:
     specifier: ^2.1.7
     version: registry.npmjs.org/pinia@2.1.7(typescript@5.2.2)(vue@3.3.4)
@@ -25,9 +37,15 @@ dependencies:
     version: registry.npmjs.org/vue-router@4.2.5(vue@3.3.4)
 
 devDependencies:
+  '@types/js-cookie':
+    specifier: ^3.0.5
+    version: registry.npmjs.org/@types/js-cookie@3.0.5
   '@types/node':
     specifier: ^20.8.8
     version: registry.npmjs.org/@types/node@20.8.8
+  '@types/nprogress':
+    specifier: ^0.2.2
+    version: registry.npmjs.org/@types/nprogress@0.2.2
   '@vitejs/plugin-vue':
     specifier: ^4.2.3
     version: registry.npmjs.org/@vitejs/plugin-vue@4.4.0(vite@4.4.11)(vue@3.3.4)
@@ -368,6 +386,12 @@ packages:
     version: 2.11.7
     dev: false
 
+  registry.npmjs.org/@types/js-cookie@3.0.5:
+    resolution: {integrity: sha512-dtLshqoiGRDHbHueIT9sjkd2F4tW1qPSX2xKAQK8p1e6pM+Z913GM1shv7dOqqasEMYbC5zEaClJomQe8OtQLA==, registry: https://registry.npmjs.com/, tarball: https://registry.npmjs.org/@types/js-cookie/-/js-cookie-3.0.5.tgz}
+    name: '@types/js-cookie'
+    version: 3.0.5
+    dev: true
+
   registry.npmjs.org/@types/lodash-es@4.17.10:
     resolution: {integrity: sha512-YJP+w/2khSBwbUSFdGsSqmDvmnN3cCKoPOL7Zjle6s30ZtemkkqhjVfFqGwPN7ASil5VyjE2GtyU/yqYY6mC0A==, registry: https://registry.npmjs.com/, tarball: https://registry.npmjs.org/@types/lodash-es/-/lodash-es-4.17.10.tgz}
     name: '@types/lodash-es'
@@ -388,6 +412,12 @@ packages:
     version: 20.8.8
     dependencies:
       undici-types: registry.npmjs.org/undici-types@5.25.3
+    dev: true
+
+  registry.npmjs.org/@types/nprogress@0.2.2:
+    resolution: {integrity: sha512-2wLrSJXLztGmr7wXwM0hA/wuIOY9DznVdd+ZFofHOiXcj9JnVt+2ZeLRJ7v5ZVlmheSkUOSg3Q3O4Ce7yji79A==, registry: https://registry.npmjs.com/, tarball: https://registry.npmjs.org/@types/nprogress/-/nprogress-0.2.2.tgz}
+    name: '@types/nprogress'
+    version: 0.2.2
     dev: true
 
   registry.npmjs.org/@types/web-bluetooth@0.0.16:
@@ -822,6 +852,13 @@ packages:
     hasBin: true
     dev: true
 
+  registry.npmjs.org/js-cookie@3.0.5:
+    resolution: {integrity: sha512-cEiJEAEoIbWfCZYKWhVwFuvPX1gETRYPw6LlaTKoxD3s2AkXzkCjnp6h0V77ozyqj0jakteJ4YqDJT830+lVGw==, registry: https://registry.npmjs.com/, tarball: https://registry.npmjs.org/js-cookie/-/js-cookie-3.0.5.tgz}
+    name: js-cookie
+    version: 3.0.5
+    engines: {node: '>=14'}
+    dev: false
+
   registry.npmjs.org/lodash-es@4.17.21:
     resolution: {integrity: sha512-mKnC+QJ9pWVzv+C4/U3rRsHapFfHvQFoFB92e52xeyGMcX6/OlIl78je1u8vePzYZSkkogMPJ2yjxxsb89cxyw==, registry: https://registry.npmjs.com/, tarball: https://registry.npmjs.org/lodash-es/-/lodash-es-4.17.21.tgz}
     name: lodash-es
@@ -914,6 +951,18 @@ packages:
     resolution: {integrity: sha512-Wj7+EJQ8mSuXr2iWfnujrimU35R2W4FAErEyTmJoJ7ucwTn2hOUSsRehMb5RSYkxXGTM7Y9QpvPmp++w5ftoJw==, registry: https://registry.npmjs.com/, tarball: https://registry.npmjs.org/normalize-wheel-es/-/normalize-wheel-es-1.2.0.tgz}
     name: normalize-wheel-es
     version: 1.2.0
+    dev: false
+
+  registry.npmjs.org/normalize.css@8.0.1:
+    resolution: {integrity: sha512-qizSNPO93t1YUuUhP22btGOo3chcvDFqFaj2TRybP0DMxkHOCTYwp3n34fel4a31ORXy4m1Xq0Gyqpb5m33qIg==, registry: https://registry.npmjs.com/, tarball: https://registry.npmjs.org/normalize.css/-/normalize.css-8.0.1.tgz}
+    name: normalize.css
+    version: 8.0.1
+    dev: false
+
+  registry.npmjs.org/nprogress@0.2.0:
+    resolution: {integrity: sha512-I19aIingLgR1fmhftnbWWO3dXc0hSxqHQHQb3H8m+K3TnEn/iSeTZZOyvKXWqQESMwuUVnatlCnZdLBZZt2VSA==, registry: https://registry.npmjs.com/, tarball: https://registry.npmjs.org/nprogress/-/nprogress-0.2.0.tgz}
+    name: nprogress
+    version: 0.2.0
     dev: false
 
   registry.npmjs.org/picocolors@1.0.0:

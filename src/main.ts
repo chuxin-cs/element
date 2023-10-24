@@ -7,7 +7,9 @@ import { router } from "@/router";
 import { loadPlugins } from "@/plugins";
 
 // css
+import "normalize.css"
 import "element-plus/dist/index.css";
+import "@/styles/index.scss"
 
 // 实例化
 const app = createApp(App);
