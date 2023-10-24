@@ -1,7 +1,7 @@
 <script lang="ts" setup></script>
 
 <template>
-  <h1>
-    <div>1</div>
-  </h1>
+  <div style="padding: 20px">
+    <el-card> 我是首页 </el-card>
+  </div>
 </template>
