@@ -35,5 +35,7 @@
       "tests/**/*.ts",
       "types/**/*.d.ts"
   ],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "references": [{ "path": "./tsconfig.node.json" }],
+  /** 编译器默认排除的编译文件 */
+  "exclude": ["node_modules", "dist"]
 }
