@@ -21,7 +21,7 @@ import LeftTopMode from "./LeftTopMode.vue";
 
 import { ref } from "vue";
 
-let layoutMode = ref<string>("left");
+let layoutMode = ref<string>("left-top");
 </script>
 
 <style scoped lang="scss"></style>

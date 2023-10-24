@@ -3,9 +3,10 @@ import store from "@/store";
 import { defineStore } from "pinia";
 import { type RouteRecordRaw } from "vue-router";
 import { constantRoutes } from "@/router/routes";
+import { asyncRoutes } from "@/router/routes";
 
 export const usePermissionStore = defineStore("permission", () => {
-  const routes = ref<RouteRecordRaw[]>([...constantRoutes]);
+  const routes = ref<RouteRecordRaw[]>([...constantRoutes, ...asyncRoutes]);
   const dynamicRoutes = ref<RouteRecordRaw[]>([]);
 
   const setRoutes = () => {

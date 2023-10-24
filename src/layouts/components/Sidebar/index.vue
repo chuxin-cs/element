@@ -38,6 +38,11 @@ const textColor = computed(() =>
 const activeTextColor = computed(() =>
   isLeft.value ? v3SidebarMenuActiveTextColor : undefined
 );
+const sidebarMenuItemHeight = computed(() => {
+  return layoutMode.value !== "top"
+    ? "var(--v3-sidebar-menu-item-height)"
+    : "var(--v3-navigationbar-height)";
+});
 
 const route = useRoute();
 const activeMenu = computed(() => {
@@ -51,6 +56,14 @@ const activeMenu = computed(() => {
 // 当为顶部模式时隐藏垂直滚动条
 const hiddenScrollbarVerticalBar = computed(() => {
   return layoutMode.value === "top" ? "none" : "block";
+});
+const sidebarMenuHoverBgColor = computed(() => {
+  return layoutMode.value !== "top"
+    ? "var(--v3-sidebar-menu-hover-bg-color)"
+    : "transparent";
+});
+const tipLineWidth = computed(() => {
+  return layoutMode.value !== "top" ? "2px" : "0px";
 });
 </script>
 
@@ -82,7 +95,26 @@ const hiddenScrollbarVerticalBar = computed(() => {
   </div>
 </template>
 
-<style scoped lang="scss">
+<style lang="scss" scoped>
+%tip-line {
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: v-bind(tipLineWidth);
+    height: 100%;
+    background-color: var(--v3-sidebar-menu-tip-line-bg-color);
+  }
+}
+
+.has-logo {
+  .el-scrollbar {
+    // 多 1% 是为了在左侧模式时侧边栏最底部不显示 1px 左右的白色线条
+    height: calc(101% - var(--v3-header-height));
+  }
+}
+
 .el-scrollbar {
   // 多 1% 是为了在顶部模式时防止垂直滚动
   height: 101%;
@@ -102,6 +134,52 @@ const hiddenScrollbarVerticalBar = computed(() => {
     &.is-vertical {
       // 当为顶部模式时隐藏垂直滚动条
       display: v-bind(hiddenScrollbarVerticalBar);
+    }
+  }
+}
+
+.el-menu {
+  border: none;
+  min-height: 100%;
+  width: 100% !important;
+}
+
+.el-menu--horizontal {
+  height: v-bind(sidebarMenuItemHeight);
+}
+
+:deep(.el-menu-item),
+:deep(.el-sub-menu__title),
+:deep(.el-sub-menu .el-menu-item),
+:deep(.el-menu--horizontal .el-menu-item) {
+  height: v-bind(sidebarMenuItemHeight);
+  line-height: v-bind(sidebarMenuItemHeight);
+  &.is-active,
+  &:hover {
+    background-color: v-bind(sidebarMenuHoverBgColor);
+  }
+  display: block;
+  * {
+    vertical-align: middle;
+  }
+}
+
+:deep(.el-sub-menu) {
+  &.is-active {
+    > .el-sub-menu__title {
+      color: v-bind(activeTextColor) !important;
+    }
+  }
+}
+
+:deep(.el-menu-item.is-active) {
+  @extend %tip-line;
+}
+
+.el-menu--collapse {
+  :deep(.el-sub-menu.is-active) {
+    .el-sub-menu__title {
+      @extend %tip-line;
     }
   }
 }

@@ -90,6 +90,7 @@ const resolvePath = (routePath: string) => {
         </el-menu-item>
       </SidebarItemLink>
     </template>
+
     <el-sub-menu v-else :index="resolvePath(props.item.path)" teleported>
       <template #title>
         <SvgIcon

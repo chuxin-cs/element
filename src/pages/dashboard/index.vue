@@ -1,5 +1,7 @@
 <script lang="ts" setup></script>
 
 <template>
-  <h1>首页</h1>
+  <h1>
+    <div>1</div>
+  </h1>
 </template>
