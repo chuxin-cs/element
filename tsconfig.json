@@ -13,6 +13,12 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "preserve",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+
+    // https://github.com/johnsoncodehk/volar/discussions/202
+    "types": ["element-plus/global"],
 
     /* Linting */
     "strict": true,
