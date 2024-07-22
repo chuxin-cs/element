@@ -1,0 +1,15 @@
+{
+  "name": "demo-ast",
+  "version": "1.0.0",
+  "description": "ast 学习笔记入门指南~",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "vite": "^5.3.4"
+  }
+}
