@@ -1,8 +1,17 @@
 <template>
   <div id="app">
-    <router-view />
+    <h1>avatar</h1>
+    <cx-avatar />
   </div>
 </template>
+
+<script>
+export default {
+  data() {
+    return {};
+  },
+};
+</script>
 
 <style lang="scss">
 * {
