@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>支持整列/整行拖拽的表格</title>
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f5f7fa; }
+
+    .table-container { background: #fff; border: 1px solid #ebeef5; border-radius: 4px; overflow: hidden; }
+
+    .table-row { display: flex; border-bottom: 1px solid #ebeef5; position: relative; }
+    .table-header { font-weight: bold; background: #fafafa; }
+
+    .table-cell {
+      padding: 12px;
+      border-right: 1px solid #ebeef5;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* 行高拖拽手柄 */
+    .row-resize-handle {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      cursor: row-resize;
+      background: transparent;
+    }
+    .row-resize-handle:hover { background: #409eff55; }
+
+    /* 列宽拖拽手柄：整列都支持 */
+    .col-resize-handle {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 5px;
+      height: 100%;
+      cursor: col-resize;
+      background: transparent;
+    }
+    .col-resize-handle:hover {
+      background: #409eff55;
+    }
+
+    /* 鼠标悬停整列高亮 */
+    .highlight-col {
+      background: #ecf5ff !important;
+    }
+    /* 鼠标悬停整行高亮 */
+    .highlight-row {
+      background: #f0f9eb !important;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <h2>支持整列/整行拖拽的表格</h2>
+  <div class="table-container">
+    <!-- 表头 -->
+    <div class="table-row table-header">
+      <div 
+        v-for="(col, key) in columns" 
+        :key="key"
+        class="table-cell"
+        :style="{ width: col.width + 'px' }"
+      >
+        {{ col.label }}
+        <!-- 表头也放拖拽条 -->
+        <div 
+          class="col-resize-handle"
+          @mousedown="startColResize(key, $event)"
+          @mouseenter="highlightCol = key"
+          @mouseleave="highlightCol = null"
+        ></div>
+      </div>
+    </div>
+
+    <!-- 内容行 -->
+    <div 
+      class="table-row" 
+      v-for="(row, rowIndex) in tableData" 
+      :key="rowIndex"
+      :style="{ height: row.rowHeight + 'px' }"
+      @mouseenter="highlightRow = rowIndex"
+      @mouseleave="highlightRow = null"
+      :class="{ 'highlight-row': highlightRow === rowIndex }"
+    >
+      <div 
+        v-for="(col, key) in columns" 
+        :key="key"
+        class="table-cell"
+        :style="{ width: col.width + 'px' }"
+        :class="{ 'highlight-col': highlightCol === key }"
+      >
+        {{ row[key] }}
+        <!-- 列宽拖拽条 -->
+        <div 
+          class="col-resize-handle"
+          @mousedown="startColResize(key, $event)"
+          @mouseenter="highlightCol = key"
+          @mouseleave="highlightCol = null"
+        ></div>
+        <!-- 行高拖拽条 -->
+        <div 
+          v-if="key === lastColumnKey"
+          class="row-resize-handle"
+          @mousedown="startRowResize(rowIndex, $event)"
+        ></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+new Vue({
+  el: '#app',
+  data: {
+    columns: {
+      testQuestion: { label: '测试题', width: 200 },
+      responseContent: { label: '响应内容', width: 400 },
+      machineReview: { label: '机审结果', width: 150 },
+      humanReview: { label: '人工审核', width: 150 },
+    },
+    tableData: [],
+    resizing: { colKey: null, startX: 0, startWidth: 0 },
+    rowResizing: { rowIndex: null, startY: 0, startHeight: 0 },
+    highlightCol: null,
+    highlightRow: null,
+  },
+  computed: {
+    lastColumnKey() {
+      return Object.keys(this.columns)[Object.keys(this.columns).length - 1];
+    }
+  },
+  created() {
+    for (let i = 1; i <= 15; i++) {
+      this.tableData.push({
+        testQuestion: `测试问题 ${i}`,
+        responseContent: `这是测试问题 ${i} 的响应内容，可能很长。`,
+        machineReview: i % 2 ? '安全' : '不安全',
+        humanReview: i % 3 ? '安全' : '拒绝',
+        rowHeight: 80
+      });
+    }
+  },
+  mounted() {
+    window.addEventListener('mousemove', this.onMouseMove);
+    window.addEventListener('mouseup', this.onMouseUp);
+  },
+  methods: {
+    // 列宽调整
+    startColResize(key, e) {
+      this.resizing = { colKey: key, startX: e.clientX, startWidth: this.columns[key].width };
+      e.preventDefault();
+    },
+    // 行高调整
+    startRowResize(index, e) {
+      this.rowResizing = { rowIndex: index, startY: e.clientY, startHeight: this.tableData[index].rowHeight };
+      e.preventDefault();
+    },
+    onMouseMove(e) {
+      if (this.resizing.colKey) {
+        const delta = e.clientX - this.resizing.startX;
+        this.columns[this.resizing.colKey].width = Math.max(50, this.resizing.startWidth + delta);
+      }
+      if (this.rowResizing.rowIndex !== null) {
+        const delta = e.clientY - this.rowResizing.startY;
+        this.tableData[this.rowResizing.rowIndex].rowHeight = Math.max(40, this.rowResizing.startHeight + delta);
+      }
+    },
+    onMouseUp() {
+      this.resizing.colKey = null;
+      this.rowResizing.rowIndex = null;
+    }
+  }
+});
+</script>
+</body>
+</html>

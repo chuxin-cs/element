@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>审核表格系统</title>
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    
+    body {
+      background-color: #f5f7fa;
+      padding: 20px;
+      color: #333;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    h2 {
+      margin-bottom: 20px;
+      color: #303133;
+      text-align: center;
+    }
+    
+    .table-container {
+      background: #fff;
+      border-radius: 4px;
+      box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+      margin-bottom: 20px;
+      position: relative;
+    }
+    
+    .table-header {
+      display: flex;
+      background: #f5f7fa;
+      border-bottom: 2px solid #409eff;
+      font-weight: bold;
+      position: relative;
+    }
+    
+    .table-row {
+      display: flex;
+      border-bottom: 1px solid #ebeef5;
+      position: relative;
+    }
+    
+    .table-cell {
+      padding: 12px 16px;
+      position: relative;
+      overflow: hidden;
+      border-right: 1px solid #ebeef5;
+    }
+    
+    /* 列宽调整线 */
+    .col-resize-line {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      width: 6px;
+      background: transparent;
+      cursor: col-resize;
+      z-index: 10;
+    }
+    
+    .col-resize-line:hover, .col-resize-line.active {
+      background: #409eff;
+    }
+    
+    /* 行高调整线 */
+    .row-resize-line {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: 6px;
+      background: transparent;
+      cursor: row-resize;
+      z-index: 10;
+    }
+    
+    .row-resize-line:hover, .row-resize-line.active {
+      background: #409eff;
+    }
+    
+    .response-content {
+      position: relative;
+    }
+    
+    .content-text {
+      height: 100%;
+      overflow-y: auto;
+      line-height: 1.5;
+      color: #606266;
+    }
+    
+    select {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #dcdfe6;
+      border-radius: 4px;
+      color: #606266;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    
+    select:focus {
+      border-color: #409eff;
+    }
+    
+    .pagination {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 20px;
+      background: #fff;
+      border-top: 1px solid #ebeef5;
+    }
+    
+    .page-info {
+      color: #606266;
+      font-size: 14px;
+    }
+    
+    .page-controls {
+      display: flex;
+      align-items: center;
+    }
+    
+    .page-btn {
+      padding: 8px 12px;
+      margin: 0 5px;
+      background: #f4f4f5;
+      color: #606266;
+      border: 1px solid #d9d9d9;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    .page-btn:hover:not(.disabled) {
+      color: #409eff;
+      border-color: #409eff;
+    }
+    
+    .page-btn.disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+    
+    .page-size-select {
+      width: auto;
+      margin: 0 10px;
+    }
+    
+    .return-btn {
+      padding: 8px 16px;
+      background: #409eff;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    
+    .return-btn:hover {
+      background: #66b1ff;
+    }
+    
+    .hint-text {
+      color: #f56c6c;
+      font-size: 12px;
+      margin-top: 10px;
+      text-align: center;
+    }
+    
+    .scroll-hint {
+      position: absolute;
+      right: 10px;
+      bottom: 10px;
+      background: rgba(245, 108, 108, 0.8);
+      color: white;
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      z-index: 20;
+      animation: pulse 2s infinite;
+    }
+    
+    .width-hint {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      background: rgba(64, 158, 255, 0.8);
+      color: white;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      z-index: 20;
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0% { opacity: 0.7; }
+      50% { opacity: 1; }
+      100% { opacity: 0.7; }
+    }
+    
+    .resize-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 100;
+      display: none;
+    }
+    
+    .resize-overlay.active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="container">
+      <h2>审核表格系统</h2>
+      
+      <div class="table-container">
+        <!-- 表头 -->
+        <div class="table-header">
+          <div class="table-cell" :style="{ width: columns.testQuestion.width + 'px' }">
+            测试题
+            <div class="width-hint">左右调整宽度</div>
+          </div>
+          <div class="table-cell" :style="{ width: columns.responseContent.width + 'px' }">
+            响应内容
+            <div class="width-hint">左右调整宽度</div>
+          </div>
+          <div class="table-cell" :style="{ width: columns.machineReview.width + 'px' }">
+            机审结果
+            <div class="width-hint">左右调整宽度</div>
+          </div>
+          <div class="table-cell" :style="{ width: columns.humanReview.width + 'px' }">
+            人工审核结果
+          </div>
+        </div>
+        
+        <!-- 列宽调整线 -->
+        <div 
+          class="col-resize-line" 
+          :style="{ left: columns.testQuestion.width + 'px' }"
+          @mousedown="startResize('testQuestion', $event)"
+        ></div>
+        <div 
+          class="col-resize-line" 
+          :style="{ left: (columns.testQuestion.width + columns.responseContent.width) + 'px' }"
+          @mousedown="startResize('responseContent', $event)"
+        ></div>
+        <div 
+          class="col-resize-line" 
+          :style="{ left: (columns.testQuestion.width + columns.responseContent.width + columns.machineReview.width) + 'px' }"
+          @mousedown="startResize('machineReview', $event)"
+        ></div>
+        
+        <!-- 表格内容 -->
+        <div 
+          class="table-row" 
+          v-for="(item, index) in paginatedData" 
+          :key="index"
+          :style="{ height: item.rowHeight + 'px' }"
+        >
+          <!-- 测试题 -->
+          <div class="table-cell" :style="{ width: columns.testQuestion.width + 'px' }">
+            {{ item.testQuestion }}
+          </div>
+          
+          <!-- 响应内容 -->
+          <div class="table-cell response-content" :style="{ width: columns.responseContent.width + 'px' }">
+            <div class="content-text">
+              {{ item.responseContent }}
+            </div>
+            <div class="scroll-hint" v-if="index === 0">上下调整高度</div>
+          </div>
+          
+          <!-- 机审结果 -->
+          <div class="table-cell" :style="{ width: columns.machineReview.width + 'px' }">
+            <select v-model="item.machineReview">
+              <option value="安全">安全</option>
+              <option value="不安全">不安全</option>
+              <option value="拒答">拒答</option>
+            </select>
+          </div>
+          
+          <!-- 人工审核结果 -->
+          <div class="table-cell" :style="{ width: columns.humanReview.width + 'px' }">
+            <select v-model="item.humanReview">
+              <option value="安全">安全</option>
+              <option value="不安全">不安全</option>
+              <option value="拒绝">拒绝</option>
+              <option value="否决">否决</option>
+            </select>
+          </div>
+          
+          <!-- 行高调整线 -->
+          <div 
+            class="row-resize-line" 
+            :style="{ top: (item.rowHeight - 3) + 'px' }"
+            @mousedown="startResizeHeight(index, $event)"
+          ></div>
+        </div>
+        
+        <!-- 分页控件 -->
+        <div class="pagination">
+          <div class="page-info">
+            共{{ totalItems }}条
+          </div>
+          <div class="page-controls">
+            <button 
+              class="page-btn" 
+              :class="{ disabled: currentPage === 1 }"
+              @click="prevPage"
+            >上一页</button>
+            
+            <select class="page-size-select" v-model="pageSize">
+              <option value="10">10条/页</option>
+              <option value="20">20条/页</option>
+              <option value="50">50条/页</option>
+            </select>
+            
+            <button 
+              class="page-btn" 
+              :class="{ disabled: currentPage >= totalPages }"
+              @click="nextPage"
+            >下一页</button>
+          </div>
+          <button class="return-btn">返回</button>
+        </div>
+      </div>
+      
+      <!-- 调整覆盖层 -->
+      <div class="resize-overlay" :class="{ active: resizing.column || heightResizing.index !== null }"></div>
+      
+      <div class="hint-text">
+        提示：将鼠标放在蓝色分隔线上可以左右调整列宽，放在每行底部可以上下调整行高
+      </div>
+    </div>
+  </div>
+
+  <script>
+    new Vue({
+      el: '#app',
+      data: {
+        columns: {
+          testQuestion: { width: 180 },
+          responseContent: { width: 400 },
+          machineReview: { width: 150 },
+          humanReview: { width: 150 }
+        },
+        tableData: [],
+        currentPage: 1,
+        pageSize: 10,
+        resizing: {
+          column: null,
+          startX: 0,
+          startWidth: 0
+        },
+        heightResizing: {
+          index: null,
+          startY: 0,
+          startHeight: 0
+        }
+      },
+      computed: {
+        totalItems() {
+          return this.tableData.length;
+        },
+        totalPages() {
+          return Math.ceil(this.totalItems / this.pageSize);
+        },
+        paginatedData() {
+          const start = (this.currentPage - 1) * this.pageSize;
+          return this.tableData.slice(start, start + parseInt(this.pageSize));
+        }
+      },
+      created() {
+        // 生成模拟数据
+        this.generateData();
+      },
+      mounted() {
+        // 添加全局事件监听
+        window.addEventListener('mousemove', this.handleResize);
+        window.addEventListener('mouseup', this.stopResize);
+        window.addEventListener('mousemove', this.handleHeightResize);
+        window.addEventListener('mouseup', this.stopHeightResize);
+      },
+      beforeDestroy() {
+        // 移除全局事件监听
+        window.removeEventListener('mousemove', this.handleResize);
+        window.removeEventListener('mouseup', this.stopResize);
+        window.removeEventListener('mousemove', this.handleHeightResize);
+        window.removeEventListener('mouseup', this.stopHeightResize);
+      },
+      methods: {
+        generateData() {
+          // 生成100条模拟数据
+          const responses = [
+            "这是一个响应内容示例，展示了系统如何处理用户的输入并生成相应的回答。",
+            "响应内容可能包含多种信息，需要足够的空间来展示完整的内容，以便审核人员能够全面了解情况。",
+            "在审核过程中，响应内容的质量和 appropriateness 是非常重要的评估指标，需要仔细审查。",
+            "根据不同的测试题，响应内容可能会有很大差异，有些可能很短，有些则可能非常详细和冗长。",
+            "审核人员需要根据响应内容判断其安全性，并选择适当的审核结果。这个过程需要专业的知识和经验。"
+          ];
+          
+          for (let i = 1; i <= 100; i++) {
+            this.tableData.push({
+              testQuestion: `测试问题 ${i}: 请描述您遇到的主要挑战`,
+              responseContent: responses[i % responses.length].repeat(1 + i % 3),
+              machineReview: i % 3 === 0 ? '不安全' : '安全',
+              humanReview: i % 4 === 0 ? '拒绝' : '安全',
+              rowHeight: 100 // 默认行高
+            });
+          }
+        },
+        startResize(column, e) {
+          this.resizing = {
+            column,
+            startX: e.clientX,
+            startWidth: this.columns[column].width
+          };
+          // 添加active类以改变线条颜色
+          e.target.classList.add('active');
+          e.preventDefault();
+        },
+        handleResize(e) {
+          if (this.resizing.column) {
+            const delta = e.clientX - this.resizing.startX;
+            this.columns[this.resizing.column].width = Math.max(50, this.resizing.startWidth + delta);
+          }
+        },
+        stopResize() {
+          if (this.resizing.column) {
+            // 移除active类
+            document.querySelectorAll('.col-resize-line').forEach(line => {
+              line.classList.remove('active');
+            });
+            this.resizing.column = null;
+          }
+        },
+        startResizeHeight(index, e) {
+          this.heightResizing = {
+            index,
+            startY: e.clientY,
+            startHeight: this.tableData[index].rowHeight
+          };
+          // 添加active类以改变线条颜色
+          e.target.classList.add('active');
+          e.preventDefault();
+        },
+        handleHeightResize(e) {
+          if (this.heightResizing.index !== null) {
+            const delta = e.clientY - this.heightResizing.startY;
+            const newHeight = Math.max(50, this.heightResizing.startHeight + delta);
+            
+            // 更新当前行的高度
+            this.$set(this.tableData, this.heightResizing.index, {
+              ...this.tableData[this.heightResizing.index],
+              rowHeight: newHeight
+            });
+          }
+        },
+        stopHeightResize() {
+          if (this.heightResizing.index !== null) {
+            // 移除active类
+            document.querySelectorAll('.row-resize-line').forEach(line => {
+              line.classList.remove('active');
+            });
+            this.heightResizing.index = null;
+          }
+        },
+        prevPage() {
+          if (this.currentPage > 1) {
+            this.currentPage--;
+          }
+        },
+        nextPage() {
+          if (this.currentPage < this.totalPages) {
+            this.currentPage++;
+          }
+        }
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>整行/整列拖拽（Vue2）</title>
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+ 
+  <style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "PingFang SC","Microsoft YaHei",sans-serif; padding: 20px; background: #f5f7fa; }
+
+  .table-wrap {
+    position: relative;
+    overflow-x: auto;   /* ⭐ 支持横向滚动 */
+    overflow-y: hidden;
+    border: 1px solid #ebeef5;
+    border-radius: 4px;
+    background: #fff;
+  }
+  .table {
+    display: inline-block; /* ⭐ 让 table 宽度随列拖拽扩展 */
+    min-width: 100%;       /* 保证比容器窄时能铺满 */
+    vertical-align: top;
+  }
+  .row { display: flex; border-bottom: 1px solid #ebeef5; position: relative; }
+  .row.header { background: #fafafa; font-weight: 600; }
+  .cell { position: relative; padding: 12px; border-right: 1px solid #ebeef5; overflow: hidden; flex-shrink: 0; }
+  .cell:last-child { border-right: none; }
+
+  /* 悬停效果 */
+  .row.hover-row { background: #f0f9eb !important; }
+  .hover-col { background: #ecf5ff !important; }
+
+  /* 行高拖拽手柄 */
+  .row-resize-handle {
+    position: absolute; left: 0; bottom: 0;
+    width: 100%; height: 5px;
+    cursor: row-resize;
+    background: transparent;
+    z-index: 10;
+  }
+  .row-resize-handle:hover { background: #409eff55; }
+
+  /* 贯穿整表的竖向指示线 */
+  .v-guide {
+    position: absolute; top: 0; bottom: 0;
+    width: 2px; background: #409eff;
+    pointer-events: none; opacity: .9; z-index: 20;
+  }
+  /* 实际拖拽条 */
+  .v-drag-strip {
+    position: absolute; top: 0; bottom: 0;
+    width: 8px; margin-left: -4px;
+    cursor: col-resize; background: transparent;
+    z-index: 21;
+  }
+</style>
+
+</head>
+<body>
+  <div id="app">
+    <h2>整行 / 整列拖拽表格</h2>
+
+    <div class="table-wrap" ref="wrap"
+         @mousemove="onWrapMouseMove"
+         @mouseleave="hideVGuide"
+         @mousedown="maybeStartColResize">
+
+      <!-- 贯穿整表的竖向蓝线 & 拖拽条 -->
+      <div v-if="showVGuide" class="v-guide" :style="{ left: vLineLeft + 'px' }"></div>
+      <div v-if="showVGuide" class="v-drag-strip"
+           :style="{ left: vLineLeft + 'px', width: dragStripWidth + 'px' }"
+           @mousedown.stop="startColResizeAtBoundary"></div>
+
+      <div class="table">
+        <!-- 表头 -->
+        <div class="row header">
+          <div v-for="(col, key) in columns" :key="key"
+               class="cell"
+               :class="{ 'hover-col': hoverColKey === key }"
+               :style="{ width: col.width + 'px' }">
+            {{ col.label }}
+          </div>
+        </div>
+
+        <!-- 数据行 -->
+        <div v-for="(row, rIdx) in tableData" :key="rIdx"
+             class="row"
+             :class="{ 'hover-row': hoverRowIndex === rIdx }"
+             :style="{ height: row.rowHeight + 'px' }"
+             @mouseenter="hoverRowIndex = rIdx"
+             @mouseleave="hoverRowIndex = null">
+
+          <div v-for="(col, key) in columns" :key="key"
+               class="cell"
+               :class="{ 'hover-col': hoverColKey === key }"
+               :style="{ width: col.width + 'px' }">
+            {{ row[key] }}
+          </div>
+
+          <!-- 行高拖拽（整行底部） -->
+          <div class="row-resize-handle"
+               @mousedown.stop="startRowResize(rIdx, $event)"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  new Vue({
+    el: '#app',
+    data: {
+      // 按顺序定义列
+      columns: {
+        testQuestion:   { label: '测试题',   width: 200 },
+        responseContent:{ label: '响应内容', width: 500 },
+        machineReview:  { label: '机审结果', width: 150 },
+        humanReview:    { label: '人工审核', width: 150 }
+      },
+      tableData: [],
+      // 悬停态
+      hoverColKey: null,
+      hoverRowIndex: null,
+
+      // 竖向指示线/拖拽
+      showVGuide: false,
+      vLineLeft: 0,              // 线的 left 像素
+      hoverBoundaryIndex: null,  // 悬停的是哪条边界（第 i 列右边）
+      dragStripWidth: 8,         // 实际可拖拽条的宽度
+
+      // 拖拽状态
+      colResizing: { key: null, startX: 0, startWidth: 0 },
+      rowResizing: { index: null, startY: 0, startHeight: 0 },
+    },
+    computed: {
+      // 以数组的方式拿到列顺序
+      colKeys() {
+        return Object.keys(this.columns);
+      },
+      // 每条“列边界”的 left 偏移（相对 wrap 内部左侧）
+      colBoundaries() {
+        const arr = [];
+        let acc = 0;
+        const ks = this.colKeys;
+        for (let i = 0; i < ks.length; i++) {
+          acc += this.columns[ks[i]].width;
+          if (i < ks.length - 1) { // 最后一列右侧不是可拖拽边界
+            arr.push(acc);
+          }
+        }
+        return arr; // 长度 = 列数 - 1
+      }
+    },
+    created() {
+      // 造点数据
+      for (let i = 1; i <= 12; i++) {
+        this.tableData.push({
+          testQuestion: `测试问题 ${i}`,
+          responseContent: `这是测试问题 ${i} 的响应内容，可能很长。`,
+          machineReview: i % 2 ? '安全' : '不安全',
+          humanReview: i % 3 ? '安全' : '拒绝',
+          rowHeight: 86
+        });
+      }
+    },
+    mounted() {
+      window.addEventListener('mousemove', this.onWinMouseMove);
+      window.addEventListener('mouseup', this.onWinMouseUp);
+    },
+    beforeDestroy() {
+      window.removeEventListener('mousemove', this.onWinMouseMove);
+      window.removeEventListener('mouseup', this.onWinMouseUp);
+    },
+    methods: {
+      /* ---------- 竖向整列指示 + 拖拽 ---------- */
+      onWrapMouseMove(e) {
+        // 若正在拖拽列宽，不做“贴边检测”
+        if (this.colResizing.key) return;
+
+        const rect = this.$refs.wrap.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const boundaries = this.colBoundaries;
+        const snap = 6; // 距离多近算“贴边”
+
+        let nearIdx = null;
+        let nearDist = Infinity;
+        boundaries.forEach((bx, idx) => {
+          const d = Math.abs(x - bx);
+          if (d < nearDist) { nearDist = d; nearIdx = idx; }
+        });
+
+        if (nearIdx !== null && nearDist <= snap) {
+          this.showVGuide = true;
+          this.vLineLeft = boundaries[nearIdx];
+          this.hoverBoundaryIndex = nearIdx;
+
+          // 高亮“边界左侧”的整列
+          const leftColKey = this.colKeys[nearIdx]; // 第 nearIdx 列的 key
+          this.hoverColKey = leftColKey;
+        } else {
+          this.hideVGuide();
+        }
+      },
+      hideVGuide() {
+        if (this.colResizing.key) return; // 拖拽期间不隐藏
+        this.showVGuide = false;
+        this.hoverBoundaryIndex = null;
+        this.hoverColKey = null;
+      },
+      maybeStartColResize(e) {
+        // 在 wrap 上按下：如果当前有边界悬停，就开始拖拽
+        if (this.hoverBoundaryIndex !== null) {
+          this.startColResizeAtBoundary(e);
+        }
+      },
+      startColResizeAtBoundary(e) {
+        if (this.hoverBoundaryIndex === null) return;
+        const leftColKey = this.colKeys[this.hoverBoundaryIndex];
+        this.colResizing = {
+          key: leftColKey,
+          startX: e.clientX,
+          startWidth: this.columns[leftColKey].width
+        };
+        e.preventDefault();
+      },
+      onWinMouseMove(e) {
+        // 列宽拖拽
+        if (this.colResizing.key) {
+          const delta = e.clientX - this.colResizing.startX;
+          const newW = Math.max(50, this.colResizing.startWidth + delta);
+          this.columns[this.colResizing.key].width = newW;
+          // 重新定位指示线
+          const idx = this.colKeys.indexOf(this.colResizing.key);
+          this.vLineLeft = this.colBoundaries[idx];
+          return;
+        }
+        // 行高拖拽
+        if (this.rowResizing.index !== null) {
+          const deltaY = e.clientY - this.rowResizing.startY;
+          const nh = Math.max(44, this.rowResizing.startHeight + deltaY);
+          this.tableData[this.rowResizing.index].rowHeight = nh;
+        }
+      },
+      onWinMouseUp() {
+        this.colResizing.key = null;
+        this.rowResizing.index = null;
+        // 列拖拽结束后，如果鼠标不在边界附近，隐藏指示线
+        this.hoverBoundaryIndex = null;
+        this.showVGuide = false;
+      },
+
+      /* ---------- 行高（整行）拖拽 ---------- */
+      startRowResize(rowIndex, e) {
+        this.rowResizing = {
+          index: rowIndex,
+          startY: e.clientY,
+          startHeight: this.tableData[rowIndex].rowHeight
+        };
+        e.preventDefault();
+      }
+    }
+  });
+  </script>
+</body>
+</html>

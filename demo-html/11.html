@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8" />
+  <title>整行/整列拖拽（优化版 - 禁止选中 + 自动滚动）</title>
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      padding: 20px;
+      background: #f5f7fa;
+    }
+
+    .table-wrap {
+      position: relative;
+      overflow-x: auto;
+      /* 支持横向滚动 */
+      overflow-y: auto;
+      border: 1px solid #ebeef5;
+      border-radius: 4px;
+      background: #fff;
+      height: 600px;
+    }
+
+    .table {
+      display: inline-block;
+      min-width: 100%;
+      vertical-align: top;
+    }
+
+    .row {
+      display: flex;
+      border-bottom: 1px solid #ebeef5;
+      position: relative;
+    }
+
+    .row.header {
+      background: #fafafa;
+      font-weight: 600;
+    }
+
+    .cell {
+      position: relative;
+      padding: 12px;
+      border-right: 1px solid #ebeef5;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .cell:last-child {
+      border-right: none;
+    }
+
+    .row.hover-row {
+      background: #f0f9eb !important;
+    }
+
+    .hover-col {
+      background: #ecf5ff !important;
+    }
+
+    .row-resize-handle {
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      width: 100%;
+      height: 6px;
+      cursor: row-resize;
+      background: transparent;
+      z-index: 10;
+    }
+
+    .row-resize-handle:hover {
+      background: rgba(64, 158, 255, 0.35);
+    }
+
+    .v-guide {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: #409eff;
+      pointer-events: none;
+      opacity: .95;
+      z-index: 60;
+    }
+
+    .v-drag-strip {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 10px;
+      margin-left: -5px;
+      cursor: col-resize;
+      background: transparent;
+      z-index: 61;
+    }
+
+    h2 {
+      margin-bottom: 12px;
+    }
+
+    .note {
+      margin: 10px 0;
+      color: #666;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app">
+    <div class="table-wrap" ref="wrap" @mousemove="onWrapMouseMove" @mouseleave="hideVGuide"
+      @mousedown="maybeStartColResize">
+
+      <div v-if="showVGuide" class="v-guide" :style="{ left: vLineLeft + 'px' }"></div>
+      <div v-if="showVGuide" class="v-drag-strip" :style="{ left: vLineLeft + 'px', width: dragStripWidth + 'px' }"
+        @mousedown.stop="startColResizeAtBoundary"></div>
+
+      <div class="table" ref="table">
+        <div class="row header">
+          <div v-for="(col, key) in columns" :key="key" class="cell" :class="{ 'hover-col': hoverColKey === key }"
+            :style="{ width: col.width + 'px' }">
+            {{ col.label }}
+          </div>
+        </div>
+
+        <div v-for="(row, rIdx) in tableData" :key="rIdx" class="row" :class="{ 'hover-row': hoverRowIndex === rIdx }"
+          :style="{ height: row.rowHeight + 'px' }" @mouseenter="hoverRowIndex = rIdx"
+          @mouseleave="hoverRowIndex = null">
+
+          <div v-for="(col, key) in columns" :key="key" class="cell" :class="{ 'hover-col': hoverColKey === key }"
+            :style="{ width: col.width + 'px' }">
+            <div v-if="key === 'responseContent'">
+              <div style="height:100%; overflow:auto; color:#444">{{ row[key] }}</div>
+            </div>
+            <div v-else>{{ row[key] }}</div>
+          </div>
+
+          <div class="row-resize-handle" @mousedown.stop="startRowResize(rIdx, $event)"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    new Vue({
+      el: '#app',
+      data: {
+        columns: {
+          testQuestion: { label: '测试题', width: 220 },
+          responseContent: { label: '响应内容', width: 520 },
+          machineReview: { label: '机审结果', width: 160 },
+          humanReview: { label: '人工审核', width: 160 }
+        },
+        tableData: [],
+        hoverColKey: null,
+        hoverRowIndex: null,
+
+        showVGuide: false,
+        vLineLeft: 0,
+        hoverBoundaryIndex: null,
+        dragStripWidth: 10,
+
+        colResizing: { key: null, startContentX: 0, startWidth: 0 },
+        rowResizing: { index: null, startY: 0, startHeight: 0 },
+      },
+      computed: {
+        colKeys() { return Object.keys(this.columns); },
+        colBoundaries() {
+          const arr = [];
+          let acc = 0;
+          const ks = this.colKeys;
+          for (let i = 0; i < ks.length; i++) {
+            acc += this.columns[ks[i]].width;
+            arr.push(acc);
+          }
+          return arr;
+        }
+      },
+      created() {
+        for (let i = 1; i <= 20; i++) {
+          this.tableData.push({
+            testQuestion: `测试问题 ${i}`,
+            responseContent: `这是测试问题 ${i} 的响应内容。`.repeat(1 + (i % 3)),
+            machineReview: i % 2 ? '安全' : '不安全',
+            humanReview: i % 3 ? '安全' : '拒绝',
+            rowHeight: 86
+          });
+        }
+      },
+      mounted() {
+        window.addEventListener('mousemove', this.onWinMouseMove);
+        window.addEventListener('mouseup', this.onWinMouseUp);
+      },
+      beforeDestroy() {
+        window.removeEventListener('mousemove', this.onWinMouseMove);
+        window.removeEventListener('mouseup', this.onWinMouseUp);
+      },
+      methods: {
+        clientToContentX(clientX) {
+          const wrap = this.$refs.wrap;
+          const rect = wrap.getBoundingClientRect();
+          return clientX - rect.left + wrap.scrollLeft;
+        },
+        onWrapMouseMove(e) {
+          if (this.colResizing.key) return;
+          const wrap = this.$refs.wrap;
+          const contentX = this.clientToContentX(e.clientX);
+          const boundaries = this.colBoundaries;
+          const snap = 6;
+
+          let nearIdx = null;
+          let nearDist = Infinity;
+          boundaries.forEach((bx, idx) => {
+            const d = Math.abs(contentX - bx);
+            if (d < nearDist) { nearDist = d; nearIdx = idx; }
+          });
+
+          if (nearIdx !== null && nearDist <= snap) {
+            this.showVGuide = true;
+            console.log( boundaries[nearIdx], wrap.scrollLeft);
+            this.vLineLeft = boundaries[nearIdx] - wrap.scrollLeft;
+
+            // const tableRect = this.$refs.table.getBoundingClientRect();
+            // const wrapRect = wrap.getBoundingClientRect();
+            // boundary 是内容坐标（相对于 table 左侧）
+            // this.vLineLeft = boundaries[nearIdx] + tableRect.left - wrapRect.left - wrap.scrollLeft;
+
+
+            this.hoverBoundaryIndex = nearIdx;
+            const leftColIndex = Math.min(nearIdx, this.colKeys.length - 1);
+            this.hoverColKey = this.colKeys[leftColIndex];
+          } else {
+            this.hideVGuide();
+          }
+        },
+        hideVGuide() {
+          if (this.colResizing.key) return;
+          this.showVGuide = false;
+          this.hoverBoundaryIndex = null;
+          this.hoverColKey = null;
+        },
+        maybeStartColResize(e) {
+          if (this.hoverBoundaryIndex !== null) {
+            this.startColResizeAtBoundary(e);
+          }
+        },
+        startColResizeAtBoundary(e) {
+          if (this.hoverBoundaryIndex === null) return;
+          const leftColKey = this.colKeys[Math.min(this.hoverBoundaryIndex, this.colKeys.length - 1)];
+          const startContentX = this.clientToContentX(e.clientX);
+          this.colResizing = {
+            key: leftColKey,
+            startContentX,
+            startWidth: this.columns[leftColKey].width
+          };
+          // 禁止选中文字
+          document.body.style.userSelect = 'none';
+          e.preventDefault();
+        },
+        onWinMouseMove(e) {
+          const wrap = this.$refs.wrap;
+          if (!wrap) return;
+
+          if (this.colResizing.key) {
+            const currentContentX = this.clientToContentX(e.clientX);
+            const delta = currentContentX - this.colResizing.startContentX;
+            const newW = Math.max(40, this.colResizing.startWidth + delta);
+            this.columns[this.colResizing.key].width = newW;
+
+            const idx = this.colKeys.indexOf(this.colResizing.key);
+            const boundaries = this.colBoundaries;
+            if (typeof boundaries[idx] !== 'undefined') {
+              this.vLineLeft = boundaries[idx] - wrap.scrollLeft;
+              this.showVGuide = true;
+
+              // 自动滚动：如果指示线超出可视区，则滚动
+              const guideLeft = boundaries[idx];
+              const visibleLeft = wrap.scrollLeft;
+              const visibleRight = wrap.scrollLeft + wrap.clientWidth;
+              if (guideLeft > visibleRight - 40) {
+                wrap.scrollLeft = guideLeft - wrap.clientWidth + 60;
+              } else if (guideLeft < visibleLeft + 40) {
+                wrap.scrollLeft = guideLeft - 60;
+              }
+            }
+            return;
+          }
+
+          if (this.rowResizing.index !== null) {
+            const deltaY = e.clientY - this.rowResizing.startY;
+            const nh = Math.max(44, this.rowResizing.startHeight + deltaY);
+            this.tableData[this.rowResizing.index].rowHeight = nh;
+          }
+        },
+        onWinMouseUp() {
+          this.colResizing.key = null;
+          this.rowResizing.index = null;
+          this.hoverBoundaryIndex = null;
+          this.showVGuide = false;
+          // 恢复选中
+          document.body.style.userSelect = '';
+        },
+        startRowResize(rowIndex, e) {
+          this.rowResizing = {
+            index: rowIndex,
+            startY: e.clientY,
+            startHeight: this.tableData[rowIndex].rowHeight
+          };
+          // 禁止选中文字
+          document.body.style.userSelect = 'none';
+          e.preventDefault();
+        }
+      }
+    });
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>整行/整列拖拽（修正版 - 支持滚动）</title>
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "PingFang SC","Microsoft YaHei",sans-serif; padding: 20px; background: #f5f7fa; }
+
+    .table-wrap {
+      position: relative;
+      overflow-x: auto;   /* 支持横向滚动 */
+      overflow-y: hidden;
+      border: 1px solid #ebeef5;
+      border-radius: 4px;
+      background: #fff;
+      height: 600px; /* 便于演示，内容超高可滚动纵向也行（当前只横向滚动） */
+    }
+    .table {
+      display: inline-block; /* 让表格宽度随列拖拽扩展 */
+      min-width: 100%;
+      vertical-align: top;
+    }
+    .row { display: flex; border-bottom: 1px solid #ebeef5; position: relative; }
+    .row.header { background: #fafafa; font-weight: 600; }
+    .cell { position: relative; padding: 12px; border-right: 1px solid #ebeef5; overflow: hidden; flex-shrink: 0; }
+    .cell:last-child { border-right: none; }
+
+    /* 悬停效果 */
+    .row.hover-row { background: #f0f9eb !important; }
+    .hover-col { background: #ecf5ff !important; }
+
+    /* 行高拖拽手柄（整行底部） */
+    .row-resize-handle {
+      position: absolute; left: 0; bottom: 0;
+      width: 100%; height: 6px;
+      cursor: row-resize;
+      background: transparent;
+      z-index: 10;
+    }
+    .row-resize-handle:hover { background: rgba(64,158,255,0.35); }
+
+    /* 贯穿整表的竖向指示线（视觉） */
+    .v-guide {
+      position: absolute; top: 0; bottom: 0;
+      width: 2px; background: #409eff;
+      pointer-events: none; opacity: .95; z-index: 60;
+    }
+    /* 实际拖拽条（透明，接受事件） */
+    .v-drag-strip {
+      position: absolute; top: 0; bottom: 0;
+      width: 10px; margin-left: -5px;
+      cursor: col-resize; background: transparent;
+      z-index: 61;
+    }
+
+    /* 一些页面样式 */
+    h2 { margin-bottom: 12px; }
+    .note { margin: 10px 0; color: #666; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <h2>整行 / 整列拖拽表格（支持横向滚动）</h2>
+    <div class="note">提示：向右拖大列会出现横向滚动条。即使滚动后，任意列边界（包括倒数第二/最后一列）仍可拖拽。</div>
+
+    <div class="table-wrap" ref="wrap"
+         @mousemove="onWrapMouseMove"
+         @mouseleave="hideVGuide"
+         @mousedown="maybeStartColResize">
+
+      <!-- 贯穿整表的竖向蓝色指示线 & 拖拽条 -->
+      <div v-if="showVGuide" class="v-guide" :style="{ left: vLineLeft + 'px' }"></div>
+      <div v-if="showVGuide" class="v-drag-strip"
+           :style="{ left: vLineLeft + 'px', width: dragStripWidth + 'px' }"
+           @mousedown.stop="startColResizeAtBoundary"></div>
+
+      <div class="table" ref="table">
+        <!-- 表头 -->
+        <div class="row header">
+          <div v-for="(col, key) in columns" :key="key"
+               class="cell"
+               :class="{ 'hover-col': hoverColKey === key }"
+               :style="{ width: col.width + 'px' }">
+            {{ col.label }}
+          </div>
+        </div>
+
+        <!-- 数据行 -->
+        <div v-for="(row, rIdx) in tableData" :key="rIdx"
+             class="row"
+             :class="{ 'hover-row': hoverRowIndex === rIdx }"
+             :style="{ height: row.rowHeight + 'px' }"
+             @mouseenter="hoverRowIndex = rIdx"
+             @mouseleave="hoverRowIndex = null">
+
+          <div v-for="(col, key) in columns" :key="key"
+               class="cell"
+               :class="{ 'hover-col': hoverColKey === key }"
+               :style="{ width: col.width + 'px' }">
+            <!-- 演示内容 -->
+            <div v-if="key === 'responseContent'">
+              <div style="height:100%; overflow:auto; color:#444">{{ row[key] }}</div>
+            </div>
+            <div v-else>{{ row[key] }}</div>
+          </div>
+
+          <!-- 整行底部拖拽，放在这行的最后（保证整行区域可拖拽） -->
+          <div class="row-resize-handle"
+               @mousedown.stop="startRowResize(rIdx, $event)"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  new Vue({
+    el: '#app',
+    data: {
+      // 列定义（顺序保留）
+      columns: {
+        testQuestion:    { label: '测试题',      width: 220 },
+        responseContent: { label: '响应内容',    width: 520 },
+        machineReview:   { label: '机审结果',    width: 160 },
+        humanReview:     { label: '人工审核',    width: 160 }
+      },
+      tableData: [],
+      // 悬停态
+      hoverColKey: null,
+      hoverRowIndex: null,
+
+      // 竖向指示线/拖拽
+      showVGuide: false,
+      vLineLeft: 0,              // 指示线（相对 wrap 可视区域的 left）
+      hoverBoundaryIndex: null,  // 悬停的是哪条边界（第 i 列右侧）
+      dragStripWidth: 10,        // 可拖拽区域宽度（像素）
+
+      // 拖拽状态（使用 content 坐标）
+      colResizing: { key: null, startContentX: 0, startWidth: 0 },
+      rowResizing: { index: null, startY: 0, startHeight: 0 },
+    },
+    computed: {
+      // 列 key 顺序数组
+      colKeys() { return Object.keys(this.columns); },
+
+      // 每个列边界在内容坐标系（相对于内容左侧）的 offset（包含最后一列）
+      colBoundaries() {
+        const arr = [];
+        let acc = 0;
+        const ks = this.colKeys;
+        for (let i = 0; i < ks.length; i++) {
+          acc += this.columns[ks[i]].width;
+          arr.push(acc);
+        }
+        return arr; // 长度 = 列数，最后一个为 totalWidth
+      }
+    },
+    created() {
+      // 造点数据
+      for (let i = 1; i <= 20; i++) {
+        this.tableData.push({
+          testQuestion: `测试问题 ${i}`,
+          responseContent: `这是测试问题 ${i} 的响应内容，示例文本。`.repeat(1 + (i % 4)),
+          machineReview: i % 2 ? '安全' : '不安全',
+          humanReview: i % 3 ? '安全' : '拒绝',
+          rowHeight: 86
+        });
+      }
+    },
+    mounted() {
+      window.addEventListener('mousemove', this.onWinMouseMove);
+      window.addEventListener('mouseup', this.onWinMouseUp);
+    },
+    beforeDestroy() {
+      window.removeEventListener('mousemove', this.onWinMouseMove);
+      window.removeEventListener('mouseup', this.onWinMouseUp);
+    },
+    methods: {
+      /* ---------- 辅助：把 clientX 映射到“内容坐标”（contentX） ---------- */
+      clientToContentX(clientX) {
+        const wrap = this.$refs.wrap;
+        const rect = wrap.getBoundingClientRect();
+        return clientX - rect.left + wrap.scrollLeft;
+      },
+      /* ---------- 鼠标在容器内移动：检测是否贴近某条列边界 ---------- */
+      onWrapMouseMove(e) {
+        // 正在拖拽列宽时，不执行边界“贴合检测”以免冲突
+        if (this.colResizing.key) return;
+
+        const wrap = this.$refs.wrap;
+        const contentX = this.clientToContentX(e.clientX);
+        const boundaries = this.colBoundaries; // 内容坐标数组
+        const snap = 6; // 像素容差
+
+        let nearIdx = null;
+        let nearDist = Infinity;
+        boundaries.forEach((bx, idx) => {
+          const d = Math.abs(contentX - bx);
+          if (d < nearDist) { nearDist = d; nearIdx = idx; }
+        });
+
+        if (nearIdx !== null && nearDist <= snap) {
+          // 显示贯穿全表的指示线，指示线在可视区域的 left = boundary - scrollLeft
+          this.showVGuide = true;
+          const wrapScrollLeft = wrap.scrollLeft;
+          this.vLineLeft = boundaries[nearIdx] - wrapScrollLeft;
+          this.hoverBoundaryIndex = nearIdx;
+          // 高亮“边界左侧”的列（如果 nearIdx 等于最后一个边界 idx，左侧列是最后列）
+          const leftColIndex = Math.min(nearIdx, this.colKeys.length - 1);
+          this.hoverColKey = this.colKeys[leftColIndex];
+        } else {
+          this.hideVGuide();
+        }
+      },
+
+      hideVGuide() {
+        if (this.colResizing.key) return;
+        this.showVGuide = false;
+        this.hoverBoundaryIndex = null;
+        this.hoverColKey = null;
+      },
+
+      /* 如果在容器按下且当前 hoverBoundaryIndex 不为空，则开始拖拽 */
+      maybeStartColResize(e) {
+        if (this.hoverBoundaryIndex !== null) {
+          this.startColResizeAtBoundary(e);
+        }
+      },
+
+      /* ---------- 开始在当前 hover 边界处拖拽（记录 content 坐标） ---------- */
+      startColResizeAtBoundary(e) {
+        if (this.hoverBoundaryIndex === null) return;
+        const leftColKey = this.colKeys[Math.min(this.hoverBoundaryIndex, this.colKeys.length - 1)];
+        const wrap = this.$refs.wrap;
+        const startContentX = this.clientToContentX(e.clientX);
+        this.colResizing = {
+          key: leftColKey,
+          startContentX,
+          startWidth: this.columns[leftColKey].width
+        };
+        // 阻止默认选择行为
+        e.preventDefault();
+      },
+
+      /* ---------- 全局鼠标移动：处理拖拽（列宽/行高） ---------- */
+      onWinMouseMove(e) {
+        const wrap = this.$refs.wrap;
+        if (!wrap) return;
+
+        // 列宽拖拽：以 content 坐标计算 delta
+        if (this.colResizing.key) {
+          const currentContentX = this.clientToContentX(e.clientX);
+          const delta = currentContentX - this.colResizing.startContentX;
+          const newW = Math.max(40, this.colResizing.startWidth + delta);
+          this.columns[this.colResizing.key].width = newW;
+
+          // 更新视觉指示线位置（相对于可视区）
+          const idx = this.colKeys.indexOf(this.colResizing.key);
+          const boundaries = this.colBoundaries;
+          const wrapScrollLeft = wrap.scrollLeft;
+          // 确保 idx 有效
+          if (typeof boundaries[idx] !== 'undefined') {
+            this.vLineLeft = boundaries[idx] - wrapScrollLeft;
+            this.showVGuide = true;
+          }
+          return;
+        }
+
+        // 行高拖拽
+        if (this.rowResizing.index !== null) {
+          const deltaY = e.clientY - this.rowResizing.startY;
+          const nh = Math.max(44, this.rowResizing.startHeight + deltaY);
+          this.tableData[this.rowResizing.index].rowHeight = nh;
+        }
+      },
+
+      onWinMouseUp() {
+        this.colResizing.key = null;
+        this.rowResizing.index = null;
+        // 拖拽结束后保留 hover（若鼠标仍在边界附近会继续显示），否则隐藏
+        // 为简洁起见，结束时暂时清空指示
+        this.hoverBoundaryIndex = null;
+        this.showVGuide = false;
+      },
+
+      /* ---------- 行高（整行）拖拽 ---------- */
+      startRowResize(rowIndex, e) {
+        this.rowResizing = {
+          index: rowIndex,
+          startY: e.clientY,
+          startHeight: this.tableData[rowIndex].rowHeight
+        };
+        e.preventDefault();
+      }
+    }
+  });
+  </script>
+</body>
+</html>

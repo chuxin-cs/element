@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>审核表格系统</title>
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    body {
+      background: #f5f7fa;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .table-container {
+      background: #fff;
+      border-radius: 4px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    .table-header {
+      display: flex;
+      background: #f5f7fa;
+      border-bottom: 1px solid #ebeef5;
+      font-weight: bold;
+    }
+    .table-row {
+      display: flex;
+      border-bottom: 1px solid #ebeef5;
+      position: relative;
+    }
+    .table-cell {
+      padding: 12px 16px;
+      position: relative;
+      overflow: hidden;
+      border-right: 1px solid #ebeef5;
+    }
+    .resize-handle {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 5px;
+      height: 100%;
+      cursor: col-resize;
+    }
+    .height-handle {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 5px;
+      cursor: row-resize;
+      background: transparent;
+    }
+    .content-text {
+      line-height: 1.5;
+      color: #606266;
+      overflow-y: auto;
+      height: 100%;
+    }
+    select {
+      width: 100%;
+      padding: 6px 10px;
+      border: 1px solid #dcdfe6;
+      border-radius: 4px;
+      color: #606266;
+    }
+  </style>
+</head>
+<body>
+  <div id="app" class="container">
+    <h2>审核表格系统</h2>
+    <div class="table-container">
+      <!-- 表头 -->
+      <div class="table-header">
+        <div 
+          v-for="(col, key) in columns"
+          :key="key"
+          class="table-cell"
+          :style="{ width: col.width + 'px' }"
+        >
+          {{ col.label }}
+          <div 
+            class="resize-handle"
+            @mousedown="startResize(key, $event)"
+          ></div>
+        </div>
+      </div>
+
+      <!-- 表格内容 -->
+      <div 
+        class="table-row"
+        v-for="(item, index) in paginatedData"
+        :key="index"
+        :style="{ height: item.responseHeight + 'px' }"
+      >
+        <div
+          v-for="(col, key) in columns"
+          :key="key"
+          class="table-cell"
+          :style="{ width: col.width + 'px' }"
+        >
+          <template v-if="key === 'testQuestion'">
+            {{ item.testQuestion }}
+          </template>
+          <template v-else-if="key === 'responseContent'">
+            <div class="content-text">{{ item.responseContent }}</div>
+          </template>
+          <template v-else-if="key === 'machineReview'">
+            <select v-model="item.machineReview">
+              <option value="安全">安全</option>
+              <option value="不安全">不安全</option>
+              <option value="拒答">拒答</option>
+            </select>
+          </template>
+          <template v-else-if="key === 'humanReview'">
+            <select v-model="item.humanReview">
+              <option value="安全">安全</option>
+              <option value="不安全">不安全</option>
+              <option value="拒绝">拒绝</option>
+              <option value="否决">否决</option>
+            </select>
+          </template>
+        </div>
+
+        <!-- 整行高度拖拽 -->
+        <div 
+          class="height-handle"
+          @mousedown="startResizeHeight(index, $event)"
+        ></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    new Vue({
+      el: '#app',
+      data: {
+        columns: {
+          testQuestion: { label: '测试题', width: 180 },
+          responseContent: { label: '响应内容', width: 400 },
+          machineReview: { label: '机审结果', width: 150 },
+          humanReview: { label: '人工审核结果', width: 150 }
+        },
+        tableData: [],
+        resizing: { column: null, startX: 0, startWidth: 0 },
+        heightResizing: { index: null, startY: 0, startHeight: 0 }
+      },
+      created() {
+        this.generateData();
+      },
+      mounted() {
+        window.addEventListener('mousemove', this.handleResize);
+        window.addEventListener('mouseup', this.stopResize);
+        window.addEventListener('mousemove', this.handleHeightResize);
+        window.addEventListener('mouseup', this.stopHeightResize);
+      },
+      beforeDestroy() {
+        window.removeEventListener('mousemove', this.handleResize);
+        window.removeEventListener('mouseup', this.stopResize);
+        window.removeEventListener('mousemove', this.handleHeightResize);
+        window.removeEventListener('mouseup', this.stopHeightResize);
+      },
+      computed: {
+        paginatedData() {
+          return this.tableData.slice(0, 10);
+        }
+      },
+      methods: {
+        generateData() {
+          for (let i = 1; i <= 20; i++) {
+            this.tableData.push({
+              testQuestion: `测试问题 ${i}`,
+              responseContent: `这是测试问题 ${i} 的响应内容，可能很长。`.repeat(1 + i % 3),
+              machineReview: i % 2 === 0 ? '安全' : '不安全',
+              humanReview: i % 3 === 0 ? '拒绝' : '安全',
+              responseHeight: 100
+            });
+          }
+        },
+        startResize(column, e) {
+          this.resizing = {
+            column,
+            startX: e.clientX,
+            startWidth: this.columns[column].width
+          };
+          e.preventDefault();
+        },
+        handleResize(e) {
+          if (this.resizing.column) {
+            const delta = e.clientX - this.resizing.startX;
+            this.columns[this.resizing.column].width = Math.max(60, this.resizing.startWidth + delta);
+          }
+        },
+        stopResize() {
+          this.resizing.column = null;
+        },
+        startResizeHeight(index, e) {
+          this.heightResizing = {
+            index,
+            startY: e.clientY,
+            startHeight: this.tableData[index].responseHeight
+          };
+          e.preventDefault();
+        },
+        handleHeightResize(e) {
+          if (this.heightResizing.index !== null) {
+            const delta = e.clientY - this.heightResizing.startY;
+            const newHeight = Math.max(50, this.heightResizing.startHeight + delta);
+            this.$set(this.tableData, this.heightResizing.index, {
+              ...this.tableData[this.heightResizing.index],
+              responseHeight: newHeight
+            });
+          }
+        },
+        stopHeightResize() {
+          this.heightResizing.index = null;
+        }
+      }
+    });
+  </script>
+</body>
+</html>
