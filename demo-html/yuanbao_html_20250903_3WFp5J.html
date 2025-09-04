@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vue3 扇形菜单动画</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+      font-family: 'Arial', sans-serif;
+      overflow: hidden;
+    }
+    
+    .container {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100vh;
+    }
+    
+    h1 {
+      color: white;
+      margin-bottom: 2rem;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+      font-weight: 700;
+      font-size: 2.5rem;
+    }
+    
+    .menu-container {
+      position: relative;
+      width: 400px;
+      height: 400px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .toggle-btn {
+      position: absolute;
+      width: 70px;
+      height: 70px;
+      background: linear-gradient(145deg, #42a5f5, #1976d2);
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      font-size: 30px;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+      z-index: 10;
+      transition: all 0.3s ease;
+      border: none;
+    }
+    
+    .toggle-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    }
+    
+    .toggle-btn:active {
+      transform: scale(0.95);
+    }
+    
+    .menu-item {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      background: linear-gradient(145deg, #66bb6a, #2e7d32);
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      font-size: 20px;
+      font-weight: bold;
+      box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2);
+      transition: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+      transform: translate(0, 0);
+      opacity: 0;
+      pointer-events: none;
+    }
+    
+    .menu-item.active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translate(var(--tx), var(--ty));
+    }
+    
+    .menu-item:hover {
+      transform: translate(var(--tx), var(--ty)) scale(1.1) !important;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+      background: linear-gradient(145deg, #81c784, #4caf50);
+    }
+    
+    .instructions {
+      margin-top: 2rem;
+      color: white;
+      text-align: center;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 1rem;
+      border-radius: 10px;
+      max-width: 500px;
+      backdrop-filter: blur(5px);
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="container">
+      <h1>Vue3 扇形菜单动画</h1>
+      
+      <div class="menu-container">
+        <!-- 菜单项 -->
+        <div 
+          v-for="(item, index) in menuItems" 
+          :key="item.label"
+          class="menu-item"
+          :class="{ active: isOpen }"
+          :style="getItemStyle(index)"
+          @click="handleItemClick(item)"
+        >
+          {{ item.label }}
+        </div>
+        
+        <!-- 切换按钮 -->
+        <button class="toggle-btn" @click="toggleMenu">
+          {{ isOpen ? 'X' : '≡' }}
+        </button>
+      </div>
+      
+      <div class="instructions">
+        <p>点击蓝色按钮展开/收起菜单，点击绿色菜单项可触发动作</p>
+        <p>当前状态: {{ isOpen ? '已展开' : '已收起' }} | 最后点击: {{ lastClicked }}</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { createApp, ref } = Vue;
+    
+    createApp({
+      setup() {
+        const isOpen = ref(false);
+        const lastClicked = ref('无');
+        
+        const menuItems = [
+          { label: 'F', action: 'Favorite' },
+          { label: 'E', action: 'Edit' },
+          { label: 'D', action: 'Delete' },
+          { label: 'C', action: 'Copy' },
+          { label: 'B', action: 'Bold' },
+          { label: 'A', action: 'Add' }
+        ];
+        
+        const toggleMenu = () => {
+          isOpen.value = !isOpen.value;
+        };
+        
+        const handleItemClick = (item) => {
+          lastClicked.value = item.action;
+          console.log(`Clicked: ${item.label} - ${item.action}`);
+          
+          // 可以在这里添加菜单项点击后的具体操作
+        };
+        
+        const getItemStyle = (index) => {
+          if (!isOpen.value) {
+            return {};
+          }
+          
+          // 计算扇形位置 (90度扇形，从-45度到45度)
+          const angle = (index / (menuItems.length - 1)) * Math.PI/2 - Math.PI/4;
+          const radius = 120; // 扇形半径
+          
+          const tx = radius * Math.cos(angle);
+          const ty = radius * Math.sin(angle);
+          
+          return {
+            '--tx': `${tx}px`,
+            '--ty': `${ty}px`,
+            'transition-delay': `${index * 0.05}s`
+          };
+        };
+        
+        return {
+          isOpen,
+          lastClicked,
+          menuItems,
+          toggleMenu,
+          handleItemClick,
+          getItemStyle
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
